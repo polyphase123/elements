@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elements of a Clean Future</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Poppins for a bubbly look and Inter for readability -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;800&family=Inter:wght@400;500;700&display=swap');
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(180deg, #e0f2fe 0%, #f0f9ff 100%); /* Light blue gradient */
+        }
+        h1, h2, h3, button, .symbol { font-family: 'Poppins', sans-serif; }
+
+        /* Custom scrollbar for better mobile feel */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { background-color: #a8a8a8; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background-color: #f1f1f1; }
+
+        /* Specific grid layout for the periodic table */
+        #periodic-table-grid {
+            display: grid;
+            grid-template-columns: repeat(18, 1fr);
+            gap: 4px; /* Increased gap for a chunkier, more bubbly look */
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        @media (min-width: 640px) {
+            #periodic-table-grid {
+                gap: 5px; 
+            }
+        }
+
+        .element-cell {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 3px 0; /* Increased padding */
+            border-radius: 12px; /* Super rounded corners for bubbly look */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            aspect-ratio: 1 / 1; 
+            text-align: center;
+            box-shadow: 0 6px 10px rgba(0,0,0,0.2); /* Deep shadows */
+            border-bottom: 5px solid rgba(0,0,0,0.2);
+            min-width: 1px; 
+            position: relative;
+            user-select: none;
+        }
+
+        .element-cell:hover {
+            transform: scale(1.08) translateY(-3px); /* Pop effect */
+            box-shadow: 0 12px 25px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        
+        /* Font size scaling remains responsive - slightly increased base sizes for clarity */
+        .atomic-number {
+            font-size: 2vw; /* Base: 2vw */
+            line-height: 1.2;
+            font-weight: 700;
+        }
+
+        .symbol {
+            font-size: 5vw; /* Base: 5vw */
+            line-height: 1;
+            font-weight: 900;
+        }
+
+        .name {
+            /* DECREASED FONT SIZE for mobile to fit long names */
+            font-size: 1.5vw; 
+            line-height: 1.2;
+            opacity: 1.0; /* Increased opacity for readability */
+            padding-bottom: 3px;
+        }
+
+        /* Desktop Font Sizes */
+        @media (min-width: 640px) {
+            .atomic-number { font-size: 0.8rem; }
+            .symbol { font-size: 2.0rem; }
+            .name { font-size: 0.8rem; }
+        }
+
+        /* Styling for the Bohr Model Canvas */
+        #bohr-canvas {
+            border: 3px solid #6366f1; /* Indigo border */
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-top: 1rem;
+        }
+
+        /* Icon positioning */
+        .status-icon {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            z-index: 5;
+        }
+        /* Hidden cells to maintain grid structure */
+        .placeholder {
+            visibility: hidden !important;
+            display: flex !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            cursor: default !important;
+        }
+        
+        /* Custom class for the f-block container to manage its own layout structure */
+        .f-block-container {
+            display: grid;
+            grid-template-columns: repeat(18, 1fr); /* Internal grid for centering */
+            gap: 4px; /* Matches main grid gap */
+            grid-column: 1 / span 18; 
+            margin-top: 2.5rem; /* Increased margin */
+            padding: 1.5rem 1rem;
+            background-color: #eef2ff; /* Light, inviting background */
+            border-radius: 20px;
+            box-shadow: inset 0 3px 10px rgba(0,0,0,0.15);
+        }
+
+        .f-block-gap-cell {
+            background-color: #e0e7ff !important; /* Light Indigo for the gap */
+            border: 2px dashed #93c5fd !important; /* Dashed line */
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            color: #6366f1;
+            font-weight: 700;
+            font-size: 0.75rem;
+            border-radius: 12px;
+            box-shadow: none !important;
+            cursor: default !important;
+        }
+        
+        .modal-background {
+            background-color: white !important;
+        }
+        
+        /* Custom styles for comparison modal */
+        .compare-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 640px) {
+             .compare-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+        }
+    </style>
+    <!-- Firebase Imports for Mandatory Environment Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.firebaseApp = null;
+        window.db = null;
+        window.auth = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+                window.firebaseApp = initializeApp(firebaseConfig);
+                window.db = getFirestore(window.firebaseApp);
+                window.auth = getAuth(window.firebaseApp);
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(window.auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(window.auth);
+                }
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+            }
+        });
+    </script>
+</head>
+<body class="min-h-screen p-2 sm:p-6">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header & Controls -->
+        <header class="text-center mb-6 p-4 bg-white rounded-2xl shadow-2xl">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-pink-700 tracking-tight">
+                Fun Elements for Future Energy!
+            </h1>
+            <p class="text-gray-600 mt-1 text-sm sm:text-base">
+                Discover the elements that power our world.
+            </p>
+
+            <!-- Music Player and Toggle (Includes the Question) -->
+            <div class="mt-4 p-3 bg-fuchsia-100 rounded-xl shadow-lg flex flex-col sm:flex-row items-center justify-between text-sm border-2 border-fuchsia-300">
+                <div id="music-prompt" class="font-semibold text-fuchsia-800 mb-2 sm:mb-0">
+                    Click "Start Song" if you want to play the most awesome periodic table song!
+                </div>
+                
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <!-- NEW START BUTTON -->
+                    <button id="start-song-button" onclick="promptStartMusic()" class="flex-1 px-5 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-lg shadow-md transition duration-200 focus:outline-none focus:ring-4 focus:ring-purple-400 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-10.25a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5zM10 14.5a.75.75 0 00-.75.75a.75.75 0 001.5 0a.75.75 0 00-.75-.75z" clip-rule="evenodd" /></svg>
+                        Start Song
+                    </button>
+                    
+                    <!-- PLAY/PAUSE BUTTON -->
+                    <button id="music-toggle" onclick="toggleMusic()" class="flex-1 px-5 py-2 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-lg shadow-md transition duration-200 focus:outline-none focus:ring-4 focus:ring-pink-400 flex items-center justify-center" disabled>
+                        <svg id="music-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <!-- Play Icon Path (Default state) -->
+                            <path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L5 14.772V3a1 1 0 00-2 0v16a.5.5 0 00.5.5h.5a.5.5 0 00.5-.5v-7.586l14.5-11.581A1 1 0 0018 3z" clip-rule="evenodd" />
+                        </svg>
+                        <span id="music-toggle-text">Play</span>
+                    </button>
+                </div>
+            </div>
+
+
+            <!-- Search, Filter, and Reset Controls -->
+            <div class="flex flex-col sm:flex-row gap-4 mt-4">
+                <input id="search-input" type="text" placeholder="Search by name or symbol (e.g., Li, Uranium)"
+                       class="flex-1 p-3 border-2 border-indigo-300 rounded-xl focus:ring-4 focus:ring-indigo-400 focus:border-indigo-500 transition shadow-lg">
+
+                <select id="technology-filter" class="flex-1 p-3 border-2 border-indigo-300 rounded-xl focus:ring-4 focus:ring-indigo-400 focus:border-indigo-500 transition shadow-lg bg-white font-medium text-gray-700">
+                    <option value="ALL">Show All Elements</option>
+                    <option value="RENEWABLE">Renewable Power (Lime Green)</option>
+                    <option value="NON_RENEWABLE_NUCLEAR">Nuclear Power (Hot Pink)</option>
+                    <option value="FOSSIL_FUEL">Fossil Fuel Use (Bright Orange)</option>
+                    <option value="WASTE">Waste/Byproduct (Dark Slate)</option>
+                    <option value="INFRASTRUCTURE">General Metals (Sky Blue)</option>
+                    <option value="TOXIC">Toxic/Hazardous Elements</option>
+                </select>
+                
+                <button id="ph-filter-toggle" onclick="togglePhFilter()" class="flex-1 p-3 border-2 border-green-700 bg-green-500 text-white font-semibold rounded-xl shadow-lg hover:bg-green-600 transition duration-200 focus:ring-4 focus:ring-green-400">
+                    <span id="ph-filter-text">🇵🇭 Elements Found in PH</span>
+                </button>
+                
+                <!-- NEW RESET BUTTON -->
+                <button id="reset-button" onclick="resetApp()" class="flex-1 p-3 border-2 border-gray-400 bg-gray-200 text-gray-700 font-semibold rounded-xl shadow-lg hover:bg-gray-300 transition duration-200 focus:ring-4 focus:ring-gray-400">
+                    Reset View
+                </button>
+            </div>
+            
+            <!-- Compare Button -->
+            <button id="compare-button" onclick="showComparison()" class="mt-4 w-full px-5 py-3 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-xl shadow-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-purple-400 hidden items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M11.72 1.45A.75.75 0 0010.5 1h-8.5A1.5 1.5 0 00.5 2.5v15A1.5 1.5 0 002.5 19h15a1.5 1.5 0 001.5-1.5V10.5a.75.75 0 00-1.5 0v7.114a.5.5 0 01-.5.5h-15a.5.5 0 01-.5-.5v-15a.5.5 0 01.5-.5h8.5a.75.75 0 00.72-1.05zM17.25 4a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V5.992l-4.507 4.507a.75.75 0 11-1.06-1.06l4.507-4.506H14.5a.75.75 0 01-.75-.75h3.5z" clip-rule="evenodd" />
+                </svg>
+                <span id="compare-text">Compare Selected (0)</span>
+            </button>
+
+
+             <!-- Key -->
+             <div class="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs sm:text-sm font-medium p-2 rounded-lg">
+                <div class="flex items-center justify-center">
+                    <div class="w-4 h-4 rounded-full bg-lime-500 border border-lime-700 shadow-inner mr-2"></div>
+                    <span class="text-gray-700">RE Critical</span>
+                </div>
+                <div class="flex items-center justify-center">
+                    <div class="w-4 h-4 rounded-full bg-pink-500 border border-pink-700 shadow-inner mr-2"></div>
+                    <span class="text-gray-700">Nuclear Critical</span>
+                </div>
+                <div class="flex items-center justify-center">
+                    <div class="w-4 h-4 rounded-full bg-orange-500 border border-orange-700 shadow-inner mr-2"></div>
+                    <span class="text-gray-700">Fossil Fuel Use</span>
+                </div>
+                <div class="flex items-center justify-center">
+                    <div class="w-4 h-4 rounded-full bg-slate-600 border border-slate-800 shadow-inner mr-2"></div>
+                    <span class="text-gray-700">Waste/Byproduct</span>
+                </div>
+                <div class="flex items-center justify-center">
+                    <div class="w-4 h-4 rounded-full bg-sky-400 border border-sky-600 shadow-inner mr-2"></div>
+                    <span class="text-gray-700">Standard</span>
+                </div>
+            </div>
+        </header>
+
+
+        <!-- Periodic Table Grid Container -->
+        <div id="periodic-table-grid" class="mt-8">
+            <!-- Table will be rendered here by JavaScript -->
+        </div>
+    </div>
+
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden transition-opacity duration-300 items-center justify-center p-4">
+        <div class="modal-background rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden transform transition-all duration-300 scale-95 opacity-0" id="modal-content">
+            
+            <!-- Modal Header -->
+            <div class="p-6 sm:p-8 flex items-start border-b border-gray-200">
+                <div id="modal-symbol-box" class="w-16 h-16 flex items-center justify-center rounded-xl shadow-xl mr-4 text-4xl font-extrabold text-white flex-shrink-0 border-b-4">
+                    <!-- Symbol -->
+                </div>
+                <div>
+                    <h2 id="modal-name" class="text-3xl font-bold text-gray-900 font-poppins"></h2>
+                    <p id="modal-number" class="text-sm text-gray-500"></p>
+                    <p class="text-sm text-gray-600">
+                        <strong class="text-pink-600">Weight:</strong> <span id="modal-weight"></span>
+                        <span class="mx-2 text-gray-300">|</span>
+                        <strong class="text-pink-600">Category:</strong> <span id="modal-category"></span>
+                    </p>
+                </div>
+                <button onclick="hideDetails()" class="ml-auto text-gray-400 hover:text-gray-700 transition flex-shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Modal Body (Tabs or Sections) -->
+            <div class="p-6 pt-0 sm:p-8 sm:pt-4 overflow-y-auto max-h-[80vh]">
+
+                <!-- NEW: Compare Checkbox -->
+                 <div class="flex items-center justify-between p-3 mb-4 bg-purple-50 border border-purple-200 rounded-lg shadow-inner">
+                    <label for="compare-checkbox" class="text-purple-800 font-bold flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M10 2a8 8 0 00-6.19 13.56L10 18.5l6.19-2.94A8 8 0 0010 2zm-4.72 12.03a6.5 6.5 0 0110.15 0L10 16.35l-3.28-2.32z" clip-rule="evenodd" />
+                        </svg>
+                        Add to Material Comparison
+                    </label>
+                    <input type="checkbox" id="compare-checkbox" onchange="toggleCompare(event)" 
+                           class="h-5 w-5 text-purple-600 border-purple-300 rounded focus:ring-purple-500">
+                </div>
+
+
+                <!-- 1. Energy Role and Status -->
+                <section class="mb-6">
+                    <h3 class="text-xl font-semibold text-pink-700 mb-2 font-poppins">Energy & Strategic Role</h3>
+                    <div id="modal-re-status" class="text-lg font-bold p-2 rounded-xl mb-3 border-2">
+                        <!-- Status Badge -->
+                    </div>
+                    <p id="modal-re-role" class="text-gray-600 leading-relaxed"></p>
+                </section>
+
+                <!-- 2. Sourcing & Availability -->
+                <section class="mb-6 border-t pt-4 border-gray-200">
+                    <h3 class="text-xl font-semibold text-pink-700 mb-2 font-poppins">Where It Comes From</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <p><strong>Qualitative Cost:</strong> <span id="modal-cost" class="font-mono"></span></p>
+                        <p><strong>Estimated Price:</strong> <span id="modal-price-php" class="font-mono font-bold text-pink-600"></span></p>
+                        <p><strong>Recycling Rate:</strong> <span id="modal-recycling" class="font-medium"></span></p>
+                        <div class="col-span-1 sm:col-span-2">
+                            <p class="font-medium mt-2">Global Sourcing Notes:</p>
+                            <p id="modal-sourcing-global" class="text-gray-600 italic text-xs"></p>
+                            <p class="font-medium mt-2">Philippines Sourcing Notes:</p>
+                            <p id="modal-sourcing-ph" class="text-gray-600 italic text-xs"></p>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 3. Hazards & Structure -->
+                <section class="mb-6 border-t pt-4 border-gray-200">
+                    <h3 class="text-xl font-semibold text-pink-700 mb-2 font-poppins">Hazards & Atomic Structure</h3>
+                    
+                    <div id="modal-hazard" class="text-red-700 font-bold mb-3">
+                        <!-- Hazard/Restriction Info -->
+                    </div>
+
+                    <p class="text-gray-700 font-medium">Atomic Shell Model (Bohr)</p>
+                    <canvas id="bohr-canvas" width="400" height="200" class="w-full h-40"></canvas>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comparison Modal -->
+    <div id="compare-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden transition-opacity duration-300 items-center justify-center p-4">
+        <div class="modal-background rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden transform transition-all duration-300 scale-95 opacity-0" id="compare-modal-content">
+            <!-- Close Button -->
+            <div class="flex justify-between items-center p-6 sm:p-8 border-b border-gray-200">
+                <h2 class="text-3xl font-bold text-purple-700 font-poppins">Element Comparison</h2>
+                <button onclick="hideComparison()" class="text-gray-400 hover:text-gray-700 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div id="compare-container" class="p-6 sm:p-8 overflow-x-auto">
+                 <div id="compare-grid" class="compare-grid gap-6">
+                    <!-- Comparison columns will be injected here -->
+                 </div>
+            </div>
+            <div class="p-4 border-t text-center">
+                 <button onclick="clearComparison()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                    Clear Comparison List
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- Data Definitions ---
+
+        // Data containing all 118 elements and their properties
+        const ELEMENTS_DATA = [
+            { n: 1, s: "H", name: "Hydrogen", weight: "1.008", group: 1, period: 1, category: "Nonmetal" },
+            { n: 2, s: "He", name: "Helium", weight: "4.0026", group: 18, period: 1, category: "Noble Gas" },
+            { n: 3, s: "Li", name: "Lithium", weight: "6.94", group: 1, period: 2, category: "Alkali Metal" },
+            { n: 4, s: "Be", name: "Beryllium", weight: "9.0122", group: 2, period: 2, category: "Alkaline Earth Metal" },
+            { n: 5, s: "B", name: "Boron", weight: "10.81", group: 13, period: 2, category: "Metalloid" },
+            { n: 6, s: "C", name: "Carbon", weight: "12.011", group: 14, period: 2, category: "Nonmetal" },
+            { n: 7, s: "N", name: "Nitrogen", weight: "14.007", group: 15, period: 2, category: "Nonmetal" },
+            { n: 8, s: "O", name: "Oxygen", weight: "15.999", group: 16, period: 2, category: "Nonmetal" },
+            { n: 9, s: "F", name: "Fluorine", weight: "18.998", group: 17, period: 2, category: "Halogen" },
+            { n: 10, s: "Ne", name: "Neon", weight: "20.180", group: 18, period: 2, category: "Noble Gas" },
+            { n: 11, s: "Na", name: "Sodium", weight: "22.990", group: 1, period: 3, category: "Alkali Metal" },
+            { n: 12, s: "Mg", name: "Magnesium", weight: "24.305", group: 2, period: 3, category: "Alkaline Earth Metal" },
+            { n: 13, s: "Al", name: "Aluminum", weight: "26.982", group: 13, period: 3, category: "Post-transition Metal" },
+            { n: 14, s: "Si", name: "Silicon", weight: "28.085", group: 14, period: 3, category: "Metalloid" },
+            { n: 15, s: "P", name: "Phosphorus", weight: "30.974", group: 15, period: 3, category: "Nonmetal" },
+            { n: 16, s: "S", name: "Sulfur", weight: "32.06", group: 16, period: 3, category: "Nonmetal" },
+            { n: 17, s: "Cl", name: "Chlorine", weight: "35.45", group: 17, period: 3, category: "Halogen" },
+            { n: 18, s: "Ar", name: "Argon", weight: "39.948", group: 18, period: 3, category: "Noble Gas" },
+            { n: 19, s: "K", name: "Potassium", weight: "39.098", group: 1, period: 4, category: "Alkali Metal" },
+            { n: 20, s: "Ca", name: "Calcium", weight: "40.078", group: 2, period: 4, category: "Alkaline Earth Metal" },
+            { n: 21, s: "Sc", name: "Scandium", weight: "44.956", group: 3, period: 4, category: "Transition Metal" },
+            { n: 22, s: "Ti", name: "Titanium", weight: "47.867", group: 4, period: 4, category: "Transition Metal" },
+            { n: 23, s: "V", name: "Vanadium", weight: "50.942", group: 5, period: 4, category: "Transition Metal" },
+            { n: 24, s: "Cr", name: "Chromium", weight: "51.996", group: 6, period: 4, category: "Transition Metal" },
+            { n: 25, s: "Mn", name: "Manganese", weight: "54.938", group: 7, period: 4, category: "Transition Metal" },
+            { n: 26, s: "Fe", name: "Iron", weight: "55.845", group: 8, period: 4, category: "Transition Metal" },
+            { n: 27, s: "Co", name: "Cobalt", weight: "58.933", group: 9, period: 4, category: "Transition Metal" },
+            { n: 28, s: "Ni", name: "Nickel", weight: "58.693", group: 10, period: 4, category: "Transition Metal" },
+            { n: 29, s: "Cu", name: "Copper", weight: "63.546", group: 11, period: 4, category: "Transition Metal" },
+            { n: 30, s: "Zn", name: "Zinc", weight: "65.38", group: 12, period: 4, category: "Transition Metal" },
+            { n: 31, s: "Ga", name: "Gallium", weight: "69.723", group: 13, period: 4, category: "Post-transition Metal" },
+            { n: 32, s: "Ge", name: "Germanium", weight: "72.63", group: 14, period: 4, category: "Metalloid" },
+            { n: 33, s: "As", name: "Arsenic", weight: "74.922", group: 15, period: 4, category: "Metalloid" },
+            { n: 34, s: "Se", name: "Selenium", weight: "78.971", group: 16, period: 4, category: "Nonmetal" },
+            { n: 35, s: "Br", name: "Bromine", weight: "79.904", group: 17, period: 4, category: "Halogen" },
+            { n: 36, s: "Kr", name: "Krypton", weight: "83.798", group: 18, period: 4, category: "Noble Gas" },
+            { n: 37, s: "Rb", name: "Rubidium", weight: "85.468", group: 1, period: 5, category: "Alkali Metal" },
+            { n: 38, s: "Sr", name: "Strontium", weight: "87.62", group: 2, period: 5, category: "Alkaline Earth Metal" },
+            { n: 39, s: "Y", name: "Yttrium", weight: "88.906", group: 3, period: 5, category: "Transition Metal" },
+            { n: 40, s: "Zr", name: "Zirconium", weight: "91.224", group: 4, period: 5, category: "Transition Metal" },
+            { n: 41, s: "Nb", name: "Niobium", weight: "92.906", group: 5, period: 5, category: "Transition Metal" },
+            { n: 42, s: "Mo", name: "Molybdenum", weight: "95.96", group: 6, period: 5, category: "Transition Metal" },
+            { n: 43, s: "Tc", name: "Technetium", weight: "(98)", group: 7, period: 5, category: "Transition Metal" },
+            { n: 44, s: "Ru", name: "Ruthenium", weight: "101.07", group: 8, period: 5, category: "Transition Metal" },
+            { n: 45, s: "Rh", name: "Rhodium", weight: "102.91", group: 9, period: 5, category: "Transition Metal" },
+            { n: 46, s: "Pd", name: "Palladium", weight: "106.42", group: 10, period: 5, category: "Transition Metal" },
+            { n: 47, s: "Ag", name: "Silver", weight: "107.87", group: 11, period: 5, category: "Transition Metal" },
+            { n: 48, s: "Cd", name: "Cadmium", weight: "112.41", group: 12, period: 5, category: "Transition Metal" },
+            { n: 49, s: "In", name: "Indium", weight: "114.82", group: 13, period: 5, category: "Post-transition Metal" },
+            { n: 50, s: "Sn", name: "Tin", weight: "118.71", group: 14, period: 5, category: "Post-transition Metal" },
+            { n: 51, s: "Sb", name: "Antimony", weight: "121.76", group: 15, period: 5, category: "Metalloid" },
+            { n: 52, s: "Te", name: "Tellurium", weight: "127.60", group: 16, period: 5, category: "Metalloid" },
+            { n: 53, s: "I", name: "Iodine", weight: "126.90", group: 17, period: 5, category: "Halogen" },
+            { n: 54, s: "Xe", name: "Xenon", weight: "131.29", group: 18, period: 5, category: "Noble Gas" },
+            { n: 55, s: "Cs", name: "Cesium", weight: "132.91", group: 1, period: 6, category: "Alkali Metal" },
+            { n: 56, s: "Ba", name: "Barium", weight: "137.33", group: 2, period: 6, category: "Alkaline Earth Metal" },
+            { n: 57, s: "La", name: "Lanthanum", weight: "138.91", group: 3, period: 6, category: "Transition Metal" },
+            { n: 72, s: "Hf", name: "Hafnium", weight: "178.49", group: 4, period: 6, category: "Transition Metal" },
+            { n: 73, s: "Ta", name: "Tantalum", weight: "180.95", group: 5, period: 6, category: "Transition Metal" },
+            { n: 74, s: "W", name: "Tungsten", weight: "183.84", group: 6, period: 6, category: "Transition Metal" },
+            { n: 75, s: "Re", name: "Rhenium", weight: "186.21", group: 7, period: 6, category: "Transition Metal" },
+            { n: 76, s: "Os", name: "Osmium", weight: "190.23", group: 8, period: 6, category: "Transition Metal" },
+            { n: 77, s: "Ir", name: "Iridium", weight: "192.22", group: 9, period: 6, category: "Transition Metal" },
+            { n: 78, s: "Pt", name: "Platinum", weight: "195.08", group: 10, period: 6, category: "Transition Metal" },
+            { n: 79, s: "Au", name: "Gold", weight: "196.97", group: 11, period: 6, category: "Transition Metal" },
+            { n: 80, s: "Hg", name: "Mercury", weight: "200.59", group: 12, period: 6, category: "Transition Metal" },
+            { n: 81, s: "Tl", name: "Thallium", weight: "204.38", group: 13, period: 6, category: "Post-transition Metal" },
+            { n: 82, s: "Pb", name: "Lead", weight: "207.2", group: 14, period: 6, category: "Post-transition Metal" },
+            { n: 83, s: "Bi", name: "Bismuth", weight: "208.98", group: 15, period: 6, category: "Post-transition Metal" },
+            { n: 84, s: "Po", name: "Polonium", weight: "(209)", group: 16, period: 6, category: "Post-transition Metal" },
+            { n: 85, s: "At", name: "Astatine", weight: "(210)", group: 17, period: 6, category: "Halogen" },
+            { n: 86, s: "Rn", name: "Radon", weight: "(222)", group: 18, period: 6, category: "Noble Gas" },
+            { n: 87, s: "Fr", name: "Francium", weight: "(223)", group: 1, period: 7, category: "Alkali Metal" },
+            { n: 88, s: "Ra", name: "Radium", weight: "(226)", group: 2, period: 7, category: "Alkaline Earth Metal" },
+            { n: 89, s: "Ac", name: "Actinium", weight: "(227)", group: 3, period: 7, category: "Transition Metal" },
+            { n: 104, s: "Rf", name: "Rutherfordium", weight: "(267)", group: 4, period: 7, category: "Transition Metal" },
+            { n: 105, s: "Db", name: "Dubnium", weight: "(268)", group: 5, period: 7, category: "Transition Metal" },
+            { n: 106, s: "Sg", name: "Seaborgium", weight: "(271)", group: 6, period: 7, category: "Transition Metal" },
+            { n: 107, s: "Bh", name: "Bohrium", weight: "(272)", group: 7, period: 7, category: "Transition Metal" },
+            { n: 108, s: "Hs", name: "Hassium", weight: "(270)", group: 8, period: 7, category: "Transition Metal" },
+            { n: 109, s: "Mt", name: "Meitnerium", weight: "(276)", group: 9, period: 7, category: "Transition Metal" },
+            { n: 110, s: "Ds", name: "Darmstadtium", weight: "(281)", group: 10, period: 7, category: "Transition Metal" },
+            { n: 111, s: "Rg", name: "Roentgenium", weight: "(280)", group: 11, period: 7, category: "Transition Metal" },
+            { n: 112, s: "Cn", name: "Copernicium", weight: "(285)", group: 12, period: 7, category: "Transition Metal" },
+            { n: 113, s: "Nh", name: "Nihonium", weight: "(286)", group: 13, period: 7, category: "Post-transition Metal" },
+            { n: 114, s: "Fl", name: "Flerovium", weight: "(289)", group: 14, period: 7, category: "Post-transition Metal" },
+            { n: 115, s: "Mc", name: "Moscovium", weight: "(290)", group: 15, period: 7, category: "Post-transition Metal" },
+            { n: 116, s: "Lv", name: "Livermorium", weight: "(293)", group: 16, period: 7, category: "Post-transition Metal" },
+            { n: 117, s: "Ts", name: "Tennessine", weight: "(294)", group: 17, period: 7, category: "Halogen" },
+            { n: 118, s: "Og", name: "Oganesson", weight: "(294)", group: 18, period: 7, category: "Noble Gas" },
+
+            // Lanthanides (58-71) - f-Block
+            { n: 58, s: "Ce", name: "Cerium", weight: "140.12", isLanthanide: true, category: "Lanthanide" },
+            { n: 59, s: "Pr", name: "Praseodymium", weight: "140.91", isLanthanide: true, category: "Lanthanide" },
+            { n: 60, s: "Nd", name: "Neodymium", weight: "144.24", isLanthanide: true, category: "Lanthanide" },
+            { n: 61, s: "Pm", name: "Promethium", weight: "(145)", isLanthanide: true, category: "Lanthanide" },
+            { n: 62, s: "Sm", name: "Samarium", weight: "150.36", isLanthanide: true, category: "Lanthanide" },
+            { n: 63, s: "Eu", name: "Europium", weight: "151.96", isLanthanide: true, category: "Lanthanide" },
+            { n: 64, s: "Gd", name: "Gadolinium", weight: "157.25", isLanthanide: true, category: "Lanthanide" },
+            { n: 65, s: "Tb", name: "Terbium", weight: "158.93", isLanthanide: true, category: "Lanthanide" },
+            { n: 66, s: "Dy", name: "Dysprosium", weight: "162.50", isLanthanide: true, category: "Lanthanide" },
+            { n: 67, s: "Ho", name: "Holmium", weight: "164.93", isLanthanide: true, category: "Lanthanide" },
+            { n: 68, s: "Er", name: "Erbium", weight: "167.26", isLanthanide: true, category: "Lanthanide" },
+            { n: 69, s: "Tm", name: "Thulium", weight: "168.93", isLanthanide: true, category: "Lanthanide" },
+            { n: 70, s: "Yb", name: "Ytterbium", weight: "173.05", isLanthanide: true, category: "Lanthanide" },
+            { n: 71, s: "Lu", name: "Lutetium", weight: "174.97", isLanthanide: true, category: "Lanthanide" },
+
+            // Actinides (90-103) - f-Block
+            { n: 90, s: "Th", name: "Thorium", weight: "232.04", isActinide: true, category: "Actinide" },
+            { n: 91, s: "Pa", name: "Protactinium", weight: "231.04", isActinide: true, category: "Actinide" },
+            { n: 92, s: "U", name: "Uranium", weight: "238.03", isActinide: true, category: "Actinide" },
+            { n: 93, s: "Np", name: "Neptunium", weight: "(237)", isActinide: true, category: "Actinide" },
+            { n: 94, s: "Pu", name: "Plutonium", weight: "(244)", isActinide: true, category: "Actinide" },
+            { n: 95, s: "Am", name: "Americium", weight: "(243)", isActinide: true, category: "Actinide" },
+            { n: 96, s: "Cm", name: "Curium", weight: "(247)", isActinide: true, category: "Actinide" },
+            { n: 97, s: "Bk", name: "Berkelium", weight: "(247)", isActinide: true, category: "Actinide" },
+            { n: 98, s: "Cf", name: "Californium", weight: "(251)", isActinide: true, category: "Actinide" },
+            { n: 99, s: "Es", name: "Einsteinium", weight: "(252)", isActinide: true, category: "Actinide" },
+            { n: 100, s: "Fm", name: "Fermium", weight: "(257)", isActinide: true, category: "Actinide" },
+            { n: 101, s: "Md", name: "Mendelevium", weight: "(258)", isActinide: true, category: "Actinide" },
+            { n: 102, s: "No", name: "Nobelium", weight: "(259)", isActinide: true, category: "Actinide" },
+            { n: 103, s: "Lr", name: "Lawrencium", weight: "(262)", isActinide: true, category: "Actinide" },
+        ];
+
+        // Detailed roles, sourcing, hazard, and price information
+        const CRITICAL_ELEMENT_DATA = {
+            // RENEWABLE
+            "Li": { primaryRole: "RENEWABLE", roleDetail: "Essential for **Lithium-ion batteries** 🔋 in EVs and grid storage.", cost: "H/L", estimatedPricePHPg: "₱ 5.00 - ₱ 10.00", sourcingGlobal: "Chile, Australia (Brines & Hard Rock)", sourcingPH: "None specific, but battery-grade processing is a local goal.", recycling: "Low", hazard: "None", icon: "battery-charging" },
+            "Ni": { primaryRole: "RENEWABLE", roleDetail: "Used in Li-ion battery cathodes, electrolysis catalysts, and **wind turbine gearboxes** ⚙️.", cost: "M/M", estimatedPricePHPg: "₱ 0.10 - ₱ 0.20", sourcingGlobal: "Indonesia, Russia, Canada", sourcingPH: "**Major global producer** (Nickel Laterite, e.g., Palawan, Surigao)", recycling: "High", hazard: "None", icon: "battery-charging" },
+            "Cu": { primaryRole: "RENEWABLE", roleDetail: "Essential for all electrification: **wiring** ⚡️ in solar, wind, EVs, and transmission grids.", cost: "M/M", estimatedPricePHPg: "₱ 0.40 - ₱ 0.60", sourcingGlobal: "Chile, Peru, China", sourcingPH: "**Large deposits** (e.g., in Cebu, Palawan), used in local wiring.", recycling: "Very High", hazard: "None", icon: "plug" },
+            "Si": { primaryRole: "RENEWABLE", roleDetail: "The primary semiconductor material for 90%+ of photovoltaic (PV) **solar cells** ☀️.", cost: "M/M", estimatedPricePHPg: "₱ 0.05 - ₱ 0.15", sourcingGlobal: "China, Russia, Norway", sourcingPH: "Quartz deposits for industrial use, but not PV-grade.", recycling: "Low", hazard: "None", icon: "sun" },
+            "Nd": { primaryRole: "RENEWABLE", roleDetail: "Core element in NdFeB **permanent magnets** 🧲, vital for direct-drive wind turbine generators and EV motors.", cost: "H/L", estimatedPricePHPg: "₱ 30.00 - ₱ 50.00", sourcingGlobal: "China (dominant), Australia", sourcingPH: "Not yet commercially exploited, but present in rare earth deposits.", recycling: "Very Low", hazard: "Rare", icon: "magnet" },
+            "Dy": { primaryRole: "RENEWABLE", roleDetail: "Added to NdFeB magnets 🧲 to maintain magnetic properties at high operating temperatures (High-efficiency EV motors).", cost: "H/L", estimatedPricePHPg: "₱ 150.00 - ₱ 250.00", sourcingGlobal: "China (dominant)", sourcingPH: "Not yet commercially exploited.", recycling: "Very Low", hazard: "Rare", icon: "magnet" },
+            "Co": { primaryRole: "RENEWABLE", roleDetail: "Enhances performance and lifespan in Li-ion battery cathodes 🔋 (NMC).", cost: "H/L", estimatedPricePHPg: "₱ 1.50 - ₱ 3.00", sourcingGlobal: "DRC, Russia", sourcingPH: "Trace amounts in Nickel deposits.", recycling: "Low", hazard: "None", icon: "battery-charging" },
+            "In": { primaryRole: "RENEWABLE", roleDetail: "Key component in CIGS thin-film solar cells ☀️ and transparent conductive oxides.", cost: "H/L", estimatedPricePHPg: "₱ 10.00 - ₱ 20.00", sourcingGlobal: "China, South Korea, Canada", sourcingPH: "Not specific. Byproduct of zinc mining.", recycling: "Very Low", hazard: "Rare", icon: "sun" },
+            "Ag": { primaryRole: "RENEWABLE", roleDetail: "Used as a paste to form electrodes ⚡️ that conduct electricity away from the solar cell (critical for silicon PV).", cost: "M/M", estimatedPricePHPg: "₱ 40.00 - ₱ 60.00", sourcingGlobal: "Mexico, China, Peru", sourcingPH: "Produced as a byproduct of gold/copper mining.", recycling: "Very High", hazard: "None", icon: "plug" },
+            "H": { primaryRole: "RENEWABLE", roleDetail: "Fuel source for **Hydrogen Fuel Cells** 💧 and green energy storage (produced via electrolysis).", cost: "L/H", estimatedPricePHPg: "₱ 0.005 - ₱ 0.01", sourcingGlobal: "Global (water)", sourcingPH: "The basis for a potential green hydrogen industry.", recycling: "N/A", hazard: "None", icon: "leaf" },
+            "Ti": { primaryRole: "RENEWABLE", roleDetail: "Used in lightweight, corrosion-resistant alloys for **wind turbine gearboxes and blades** ⚙️.", cost: "M/M", estimatedPricePHPg: "₱ 0.25 - ₱ 0.50", sourcingGlobal: "China, Russia, Japan", sourcingPH: "Significant titanium deposits (e.g., in Palawan) but mostly unrefined.", recycling: "Moderate", hazard: "None", icon: "building" },
+            "W": { primaryRole: "RENEWABLE", roleDetail: "Used in high-strength alloys for **turbines** and wear-resistant coatings in energy machinery ⚙️.", cost: "H/L", estimatedPricePHPg: "₱ 1.00 - ₱ 2.00", sourcingGlobal: "China, Vietnam, Russia", sourcingPH: "None", recycling: "High", hazard: "None", icon: "building" },
+            "Nb": { primaryRole: "RENEWABLE", roleDetail: "Used to create **superalloys** for highly efficient, high-temperature gas turbines in power generation and jet engines ⚙️.", cost: "M/M", estimatedPricePHPg: "₱ 0.80 - ₱ 1.50", sourcingGlobal: "Brazil, Canada", sourcingPH: "None", recycling: "High", hazard: "None", icon: "building" },
+
+
+            // NON_RENEWABLE_NUCLEAR (Hot Pink)
+            "U": { primaryRole: "NON_RENEWABLE_NUCLEAR", roleDetail: "Fuel (U-235/U-238) for **Nuclear Reactors** ☢️ (fission).", cost: "M/M", estimatedPricePHPg: "₱ 1.50 - ₱ 3.00", sourcingGlobal: "Kazakhstan, Canada, Australia", sourcingPH: "None", recycling: "Moderate (Reprocessing is complex)", hazard: "Restricted", icon: "lock" },
+            "Th": { primaryRole: "NON_RENEWABLE_NUCLEAR", roleDetail: "Potential fuel source for **Molten Salt Reactors** ☢️ (Thorium cycle).", cost: "L/H", estimatedPricePHPg: "₱ 0.05 - ₱ 0.10", sourcingGlobal: "India, Brazil, USA", sourcingPH: "Trace amounts in beach sands, not commercial.", recycling: "Low", hazard: "Restricted", icon: "lock" },
+            "Pu": { primaryRole: "NON_RENEWABLE_NUCLEAR", roleDetail: "Used in mixed oxide (MOX) fuel for nuclear reactors and weapon production ☢️.", cost: "H/L", estimatedPricePHPg: "₱ 10,000+", sourcingGlobal: "Global Stockpiles", sourcingPH: "None", recycling: "High (Reprocessing)", hazard: "Restricted", icon: "lock" },
+            
+            // FOSSIL_FUEL (Bright Orange)
+            "C": { primaryRole: "FOSSIL_FUEL", roleDetail: "Primary component of **Coal, Oil, and Natural Gas** 🔥; $\text{CO}_2$ emissions are the main waste product.", cost: "L/H", estimatedPricePHPg: "₱ 0.001 - ₱ 0.005", sourcingGlobal: "Global", sourcingPH: "**Philippine coal** (sub-bituminous) is a major energy source.", recycling: "N/A", hazard: "None", icon: "fire" },
+            "Pb": { primaryRole: "FOSSIL_FUEL", roleDetail: "Used in **Lead-Acid batteries** 🔋 for engine starting in all fossil fuel vehicles and emergency backup.", cost: "L/H", estimatedPricePHPg: "₱ 0.15 - ₱ 0.30", sourcingGlobal: "China, Australia, USA", sourcingPH: "Small deposits found.", recycling: "Very High", hazard: "Toxic", icon: "skull" },
+            "Hg": { primaryRole: "FOSSIL_FUEL", roleDetail: "Toxic byproduct of **Coal Burning** 🔥; neurotoxin risk from old industrial processes.", cost: "M/M", estimatedPricePHPg: "₱ 0.80 - ₱ 1.20", sourcingGlobal: "China, Mexico, Peru", sourcingPH: "None. Strict usage ban globally.", recycling: "Moderate", hazard: "Toxic", icon: "skull" },
+            
+            // INFRASTRUCTURE (Sky Blue)
+            "Fe": { primaryRole: "INFRASTRUCTURE", roleDetail: "Steel structure for wind turbines, electric motors, and **power plant construction** 🏗️.", cost: "L/H", estimatedPricePHPg: "₱ 0.008 - ₱ 0.015", sourcingGlobal: "Australia, Brazil, China", sourcingPH: "Existing iron ore deposits, mainly imported for finished steel.", recycling: "Very High", hazard: "None", icon: "building" },
+
+            // WASTE/BYPRODUCTS (New Slate Color)
+            "I": { primaryRole: "WASTE", roleDetail: "Iodine-129 ($\text{I}-129$) is a long-lived **nuclear fission product** ☢️ waste requiring disposal.", cost: "M/M", estimatedPricePHPg: "₱ 2.00 - ₱ 4.00", sourcingGlobal: "Chile, Japan, USA (brines and caliche ore)", sourcingPH: "None", recycling: "None (Waste)", hazard: "Toxic", icon: "radioactive" },
+            "Sr": { primaryRole: "WASTE", roleDetail: "Strontium-90 ($\text{Sr}-90$) is a major heat-emitting **nuclear fission product** ☢️ and a health hazard.", cost: "M/M", estimatedPricePHPg: "₱ 0.50 - ₱ 1.00", sourcingGlobal: "China, Spain, Mexico", sourcingPH: "None", recycling: "None (Waste)", hazard: "Toxic", icon: "radioactive" },
+            "Kr": { primaryRole: "WASTE", roleDetail: "Krypton-85 ($\text{Kr}-85$) is a volatile, radioactive **nuclear fission product** ☢️ released during fuel reprocessing.", cost: "H/L", estimatedPricePHPg: "₱ 100+", sourcingGlobal: "Global (Air Separation)", sourcingPH: "None", recycling: "None (Waste)", hazard: "Toxic", icon: "radioactive" },
+            "Xe": { primaryRole: "WASTE", roleDetail: "Xenon is a noble gas, primarily Xenon-135 ($\text{Xe}-135$), a strong **neutron absorber/fission byproduct** ☢️ in nuclear reactors.", cost: "H/L", estimatedPricePHPg: "₱ 500+", sourcingGlobal: "Global (Air Separation)", sourcingPH: "None", recycling: "Moderate (Recycled in lighting)", hazard: "None", icon: "atom" },
+            "Rn": { primaryRole: "WASTE", roleDetail: "Radon ($\text{Rn}$) is a radioactive noble gas resulting from the decay chain of uranium and thorium in soil and **mining waste** 💀.", cost: "H/L", estimatedPricePHPg: "N/A (Extremely Rare)", sourcingGlobal: "Global (U/Th decay)", sourcingPH: "Found in volcanic and uranium-rich areas.", recycling: "None", hazard: "Toxic", icon: "skull" },
+        };
+        
+        // --- Global State ---
+        let selectedFilter = 'ALL';
+        let isPhFilterActive = false; // New state variable for PH filter
+        const tableGrid = document.getElementById('periodic-table-grid');
+        const searchInput = document.getElementById('search-input');
+        const detailModal = document.getElementById('detail-modal');
+        const compareModal = document.getElementById('compare-modal'); // New modal reference
+        const phFilterToggle = document.getElementById('ph-filter-toggle'); // New button reference
+        let comparisonList = []; // New list to hold element symbols for comparison (max 3)
+        const compareButton = document.getElementById('compare-button');
+        
+        // Music Variables
+        let dynamicAudioPlayer = null; 
+        const musicToggle = document.getElementById('music-toggle');
+        const startSongButton = document.getElementById('start-song-button'); // New button reference
+        // FIX: Using dl=1 to force direct MP3 content access
+        const AUDIO_URL = "https://www.dropbox.com/scl/fi/ta20hcl9kmsj0sqxja4c7/The-Periodic-Table-Song-2018-Update_-_-SCIENCE-SONGS-rz4Dd1I_fX0.mp3?rlkey=unfw4p29t0jx6djp9sa3s0o5h&dl=1"; 
+        let isPlaying = false;
+        let countdownTimer = null; // To manage the 10-second delay
+
+        // [All helper functions (getElementData, calculateElectronShells, drawBohrModel, getElementClasses, createStatusIcon, createElementCell, createFBlockGapCell, renderTable, toggleCompare, updateCompareButtonState, clearComparison, showComparison, hideComparison, showDetails, hideDetails) remain unchanged]
+        
+        /**
+         * Finds element data by symbol.
+         */
+        function getElementData(symbol) {
+             const element = ELEMENTS_DATA.find(e => e.s === symbol);
+             const critical = CRITICAL_ELEMENT_DATA[symbol];
+             return { ...element, ...critical };
+        }
+
+
+        /**
+         * Calculates the electron configuration (Bohr Model) for a given atomic number.
+         */
+        function calculateElectronShells(atomicNumber) {
+            let n = atomicNumber;
+            const shellMax = [2, 8, 18, 32, 50, 72, 98]; // Max electrons per theoretical shell
+            const shells = [];
+
+            for (let i = 0; i < shellMax.length; i++) {
+                if (n === 0) break;
+                
+                let max = shellMax[i];
+                let count = Math.min(n, max);
+                
+                if (i > 0 && n > 8 && n - count < 8 && i < 3) { // Simple fix to cap valence at 8 for basic visualization
+                    count = n - 8;
+                    if (count < 1) count = n; // If 8 or less, fill normally
+                }
+                
+                if (n > 0) {
+                   shells.push(count);
+                   n -= count;
+                }
+            }
+            
+            const simpleConfig = [];
+            let remaining = atomicNumber;
+            const simpleMax = [2, 8, 8, 18, 18, 32, 32];
+            
+            for (const max of simpleMax) {
+                if (remaining <= 0) break;
+                
+                if (remaining <= max) {
+                    simpleConfig.push(remaining);
+                    remaining = 0;
+                } else {
+                    simpleConfig.push(max);
+                    remaining -= max;
+                }
+            }
+            
+            return simpleConfig.filter(c => c > 0);
+        }
+
+        /**
+         * Draws the Bohr model on the canvas.
+         */
+        function drawBohrModel(atomicNumber) {
+            const canvas = document.getElementById('bohr-canvas');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const shellSpacing = 20; 
+            const electronRadius = 3;
+
+            ctx.clearRect(0, 0, width, height);
+
+            if (atomicNumber === 0) return;
+
+            const shells = calculateElectronShells(atomicNumber);
+            
+            // --- Draw Nucleus (Protons = n) ---
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444'; // Red for nucleus
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.font = '10px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText(atomicNumber, centerX, centerY + 3);
+
+            // --- Draw Shells and Electrons ---
+            let currentRadius = 0;
+
+            shells.forEach((electronCount, shellIndex) => {
+                currentRadius += shellSpacing;
+
+                // Draw Shell Circle
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, currentRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = '#9ca3af';
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+
+                // Draw Electrons
+                for (let i = 0; i < electronCount; i++) {
+                    const angle = (i / electronCount) * Math.PI * 2;
+                    const x = centerX + currentRadius * Math.cos(angle);
+                    const y = centerY + currentRadius * Math.sin(angle);
+
+                    ctx.beginPath();
+                    ctx.arc(x, y, electronRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#3b82f6'; // Blue for electrons
+                    ctx.fill();
+                }
+            });
+            
+            // Add configuration text below
+            ctx.fillStyle = '#4b5563';
+            ctx.font = '14px Inter';
+            ctx.textAlign = 'center';
+            const configText = shells.join(', ');
+            ctx.fillText(`Configuration: ${configText} (${shells.length} shells)`, centerX, height - 5);
+        }
+
+        /**
+         * Determines the color class for an element based on its primary energy role.
+         */
+        function getElementClasses(element) {
+            const detail = CRITICAL_ELEMENT_DATA[element.s];
+            let baseClasses = 'element-cell text-xs border-b-4 hover:brightness-105';
+            let colorClasses;
+
+            // 1. Critical Roles Override Standard Colors
+            if (detail) {
+                switch (detail.primaryRole) {
+                    case 'RENEWABLE': 
+                        // Bright Lime Green
+                        colorClasses = 'bg-lime-500 text-lime-900 border-b-lime-700'; 
+                        break;
+                    case 'NON_RENEWABLE_NUCLEAR':
+                        // Hot Pink
+                        colorClasses = 'bg-pink-500 text-white border-b-pink-700'; 
+                        break;
+                    case 'FOSSIL_FUEL':
+                        // Bright Orange
+                        colorClasses = 'bg-orange-500 text-white border-b-orange-700'; 
+                        break;
+                    case 'INFRASTRUCTURE':
+                        // Sky Blue for general metals
+                        colorClasses = 'bg-sky-400 text-sky-900 border-b-sky-600'; 
+                        break;
+                    case 'WASTE':
+                        // Dark Slate/Gray for Waste/Byproduct
+                        colorClasses = 'bg-slate-600 text-white border-b-slate-800'; 
+                        break;
+                    default:
+                        colorClasses = 'bg-gray-300 text-gray-800 border-b-gray-500'; 
+                        break;
+                }
+            } else {
+                // 2. Standard Colors by Category (Funky Pastels/Brights)
+                switch (element.category) {
+                    case 'Noble Gas': colorClasses = 'bg-teal-300 text-teal-900 border-b-teal-500'; break; // Teal
+                    case 'Halogen': colorClasses = 'bg-yellow-300 text-yellow-900 border-b-yellow-500'; break; // Yellow
+                    case 'Nonmetal': colorClasses = 'bg-red-400 text-white border-b-red-600'; break; // Bright Red
+                    case 'Metalloid': colorClasses = 'bg-emerald-300 text-emerald-900 border-b-emerald-500'; break; // Emerald
+                    case 'Alkali Metal': colorClasses = 'bg-violet-400 text-white border-b-violet-600'; break; // Violet
+                    case 'Alkaline Earth Metal': colorClasses = 'bg-amber-300 text-amber-900 border-b-amber-500'; break; // Amber
+                    case 'Transition Metal': colorClasses = 'bg-sky-400 text-sky-900 border-b-sky-600'; break; // Sky Blue
+                    case 'Post-transition Metal': colorClasses = 'bg-gray-400 text-gray-900 border-b-gray-600'; break; // Gray
+                    case 'Lanthanide': colorClasses = 'bg-indigo-300 text-indigo-900 border-b-indigo-500'; break; // Indigo
+                    case 'Actinide': 
+                        // Light Lavender/Purple (still fun, but less aggressive)
+                        colorClasses = 'bg-fuchsia-200 text-fuchsia-900 border-b-fuchsia-400'; 
+                        break;
+                    default: colorClasses = 'bg-gray-200 text-gray-800 border-b-gray-400'; break;
+                }
+            }
+            
+            // Overwrite specific border classes defined by the generic 'border-b-4' in baseClasses
+            const borderClass = colorClasses.split(' ').find(cls => cls.startsWith('border-b-'));
+            const finalBaseClasses = baseClasses.replace(/border-b-4\s+hover:brightness-105/, `border-b-4 ${borderClass} hover:brightness-105`);
+
+            return `${finalBaseClasses.replace(borderClass, '')} ${colorClasses}`;
+        }
+
+        /**
+         * Creates a status icon (SVG) or emoji for the top-right corner of the cell.
+         */
+        function createStatusIcon(element) {
+            const detail = CRITICAL_ELEMENT_DATA[element.s];
+            let iconMarkup = '';
+
+            // 1. Hazard/Scarcity Icons (small SVG)
+            if (detail && detail.hazard !== 'None') {
+                let color = '';
+                let path = ''; 
+
+                if (detail.hazard === 'Toxic' || detail.hazard === 'Restricted') {
+                    color = 'text-red-300';
+                    // Skull or Lock icon (using skull for combined risk for simplicity)
+                    path = '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1.25-5.25a.75.75 0 011.5 0v.5a.75.75 0 01-1.5 0v-.5zM8.75 9a.75.75 0 00-1.5 0v.5a.75.75 0 001.5 0V9zm3.5 0a.75.75 0 00-1.5 0v.5a.75.75 0 001.5 0V9zm-2.25 1.5a.75.75 0 011.5 0v1a.75.75 0 01-1.5 0v-1z" clip-rule="evenodd" />';
+                } else if (detail.hazard === 'Rare') {
+                    color = 'text-cyan-300';
+                    // Diamond icon
+                    path = '<path fill-rule="evenodd" d="M9.66 1.458L2.305 13.91l8.52 4.192a.75.75 0 00.75 0l8.52-4.192L10.34 1.458a.75.75 0 00-.68 0zM10.5 3.394l6.095 10.158-7.79 3.842a.75.75 0 01-.75 0L3.905 13.552 10.5 3.394z" clip-rule="evenodd" />';
+                }
+
+                if (path) {
+                    iconMarkup = `<svg class="status-icon w-4 h-4 shadow-sm ${color}" viewBox="0 0 20 20" fill="currentColor">${path}</svg>`;
+                }
+            }
+
+            // 2. Philippines Local Icon (Emoji) - Overlays if PH filter is active
+            if (isPhFilterActive && detail && detail.sourcingPH && !detail.sourcingPH.includes("None")) {
+                 iconMarkup = `<span class="status-icon text-lg" style="top: -1px; right: 0;">🇵🇭</span>`;
+            }
+
+            // 3. Comparison Check Icon (Small dot for selected items)
+            if (comparisonList.includes(element.s)) {
+                 iconMarkup += `<span class="absolute top-1 left-1 text-purple-600 text-sm">●</span>`;
+            }
+
+            return iconMarkup;
+        }
+
+
+        /**
+         * Renders a single element cell (or a blank cell).
+         */
+        function createElementCell(element = null, isPlaceholder = false) {
+            const cell = document.createElement('div');
+            cell.classList.add('element-cell');
+
+            if (isPlaceholder) {
+                cell.classList.add('placeholder');
+                return cell;
+            }
+
+            cell.className = getElementClasses(element);
+            cell.onclick = () => showDetails(element);
+
+            cell.innerHTML = `
+                ${createStatusIcon(element)}
+                <span class="atomic-number">${element.n}</span>
+                <span class="symbol">${element.s}</span>
+                <span class="name">${element.name}</span>
+            `;
+
+            return cell;
+        }
+        
+        // Creates a placeholder cell specifically for the f-block section in rows 6 and 7
+        function createFBlockGapCell(text) {
+            const cell = document.createElement('div');
+            cell.classList.add('element-cell', 'f-block-gap-cell');
+            cell.innerHTML = `<span>${text}</span>`;
+            return cell;
+        }
+
+
+        /**
+         * Renders the entire periodic table structure using CSS Grid placement.
+         */
+        function renderTable(filterTerm = '', selectedFilter = 'ALL', isPhFilter = false) {
+            tableGrid.innerHTML = '';
+            
+            const elementMap = new Map(ELEMENTS_DATA.map(e => [e.n, e]));
+            
+            // Filter logic
+            const filterCheck = (e) => {
+                const termMatch = e.name.toLowerCase().includes(filterTerm) ||
+                                  e.s.toLowerCase().includes(filterTerm) ||
+                                  e.n.toString().includes(filterTerm);
+                
+                const detail = CRITICAL_ELEMENT_DATA[e.s];
+                let roleMatch = true;
+                let phMatch = true; // New check for Philippines filter
+
+                // 1. Technology Filter Check
+                if (selectedFilter !== 'ALL') {
+                    if (selectedFilter === 'TOXIC') {
+                        roleMatch = detail && (detail.hazard === 'Toxic' || detail.hazard === 'Restricted');
+                    } else if (selectedFilter === 'WASTE') {
+                        roleMatch = detail && detail.primaryRole === 'WASTE';
+                    } else if (selectedFilter === 'INFRASTRUCTURE' && detail) {
+                        roleMatch = detail.primaryRole === 'INFRASTRUCTURE';
+                    } else if (selectedFilter === 'NON_RENEWABLE_NUCLEAR' && detail) {
+                        roleMatch = detail.primaryRole === 'NON_RENEWABLE_NUCLEAR';
+                    } else if (selectedFilter === 'RENEWABLE' && detail) {
+                        roleMatch = detail.primaryRole === 'RENEWABLE';
+                    } else if (selectedFilter === 'FOSSIL_FUEL' && detail) {
+                        roleMatch = detail.primaryRole === 'FOSSIL_FUEL';
+                    } else {
+                        roleMatch = false; 
+                    }
+                }
+                
+                // 2. Philippines Filter Check (runs in addition to other filters)
+                if (isPhFilter) {
+                    phMatch = detail && detail.sourcingPH && !detail.sourcingPH.includes("None") && !detail.sourcingPH.includes("Not specific");
+                }
+
+
+                return termMatch && roleMatch && phMatch;
+            };
+
+            // 1. Render Main Block (Periods 1-7)
+            for (let period = 1; period <= 7; period++) {
+                for (let group = 1; group <= 18; group++) {
+                    const currentElement = ELEMENTS_DATA.find(e => e.period === period && e.group === group && !e.isLanthanide && !e.isActinide);
+                    
+                    let cell;
+
+                    if (currentElement && filterCheck(currentElement)) {
+                        cell = createElementCell(currentElement);
+                    } 
+                    
+                    // Handle Gaps and Placeholders
+                    if (period === 1 && group > 1 && group < 18) {
+                        // Gap between H (1) and He (18)
+                        tableGrid.appendChild(createElementCell(null, true));
+                    } else if (period > 1 && period < 6 && group > 2 && group < 13) {
+                         // Gap for the d-block in earlier periods
+                        tableGrid.appendChild(createElementCell(null, true));
+                    } else if (period >= 6 && group >= 4 && group <= 17) {
+                        // F-Block Gap in main table structure: 14 individual placeholder cells
+                        const text = period === 6 ? '57-71' : '89-103';
+                        const gapCell = createFBlockGapCell(text);
+                        tableGrid.appendChild(gapCell);
+                    } else if (currentElement) {
+                        // Render the found element (La, Ac, or any regular element)
+                        tableGrid.appendChild(cell || createElementCell(null, true));
+                    } else {
+                        // Render generic structural placeholder
+                        tableGrid.appendChild(createElementCell(null, true));
+                    }
+                }
+            }
+            
+            // --- 2. F-Block Separate Section (Lanthanides and Actinides) ---
+
+            // Add a container for the f-block that spans 18 columns
+            const fBlockContainer = document.createElement('div');
+            fBlockContainer.classList.add('f-block-container');
+            
+            // Add Label
+            const label = document.createElement('div');
+            label.classList.add('col-span-18', 'text-lg', 'font-bold', 'text-pink-700', 'text-center', 'mb-2');
+            label.textContent = 'Inner Transition Metals';
+            fBlockContainer.appendChild(label);
+            
+            // Add alignment placeholders (3 cells for Groups 1, 2, 3)
+            for(let i = 0; i < 3; i++) { fBlockContainer.appendChild(createElementCell(null, true)); }
+            
+            // Render Lanthanides (58-71) starting at column 4
+            for (let n = 58; n <= 71; n++) {
+                const element = elementMap.get(n);
+                if (filterCheck(element)) {
+                    fBlockContainer.appendChild(createElementCell(element));
+                } else {
+                    fBlockContainer.appendChild(createElementCell(null, true));
+                }
+            }
+            // Filler cells to complete the 18 columns for the lanthanide row
+            fBlockContainer.appendChild(createElementCell(null, true)); // 1 cell needed
+
+            // Add alignment placeholders for the Actinides (3 cells for Groups 1, 2, 3)
+            for(let i = 0; i < 3; i++) { fBlockContainer.appendChild(createElementCell(null, true)); }
+
+            // Render Actinides (90-103) starting at column 4
+            for (let n = 90; n <= 103; n++) {
+                const element = elementMap.get(n);
+                 if (filterCheck(element)) {
+                    fBlockContainer.appendChild(createElementCell(element));
+                } else {
+                    fBlockContainer.appendChild(createElementCell(null, true));
+                }
+            }
+            // Filler cells to complete the 18 columns for the actinide row
+            fBlockContainer.appendChild(createElementCell(null, true)); // 1 cell needed
+            
+            tableGrid.appendChild(fBlockContainer);
+            
+            // Update Compare Button visibility
+            updateCompareButtonState();
+        }
+
+        /**
+         * Toggles an element's inclusion in the comparison list.
+         */
+        function toggleCompare(event) {
+            const isChecked = event.target.checked;
+            const elementSymbol = event.target.value;
+            
+            if (isChecked) {
+                if (comparisonList.length < 3) {
+                    comparisonList.push(elementSymbol);
+                } else {
+                    // Alert user if trying to select more than 3 (without using alert())
+                    event.target.checked = false; // Revert checkbox state
+                    console.error("Comparison Limit Reached: Only 3 elements can be compared at a time.");
+                    const statusMessage = document.getElementById('modal-hazard');
+                    statusMessage.innerHTML = '🛑 **Limit Reached:** Please unselect an element before adding another (Max 3).';
+                    statusMessage.classList.remove('text-green-700');
+                    statusMessage.classList.add('text-red-700');
+                    // Hide the detail modal after a small delay so the message is seen
+                    setTimeout(hideDetails, 2000); 
+                }
+            } else {
+                comparisonList = comparisonList.filter(s => s !== elementSymbol);
+            }
+
+            updateCompareButtonState();
+            renderTable(searchInput.value.toLowerCase().trim(), document.getElementById('technology-filter').value, isPhFilterActive); // Re-render to update the dots
+        }
+        
+        /**
+         * Updates the text and visibility of the global compare button.
+         */
+        function updateCompareButtonState() {
+            const count = comparisonList.length;
+            const buttonText = document.getElementById('compare-text');
+            
+            buttonText.textContent = `Compare Selected (${count})`;
+            
+            if (count >= 2) {
+                compareButton.classList.remove('hidden');
+                compareButton.classList.add('flex');
+            } else {
+                compareButton.classList.remove('flex');
+                compareButton.classList.add('hidden');
+            }
+        }
+        
+        /**
+         * Clears the comparison list and updates the UI.
+         */
+        function clearComparison() {
+            comparisonList = [];
+            updateCompareButtonState();
+            hideComparison();
+            renderTable(searchInput.value.toLowerCase().trim(), document.getElementById('technology-filter').value, isPhFilterActive);
+        }
+        
+        /**
+         * Shows the element comparison modal.
+         */
+        function showComparison() {
+            const compareContainer = document.getElementById('compare-grid');
+            compareContainer.innerHTML = ''; // Clear previous content
+
+            if (comparisonList.length < 2) {
+                // Should not happen if button state is correct, but good fallback
+                return;
+            }
+            
+            comparisonList.forEach(symbol => {
+                const elementData = getElementData(symbol);
+                const elementClasses = getElementClasses(elementData);
+                const colorClass = elementClasses.split(' ').find(c => c.startsWith('bg-'));
+
+                const primaryRole = elementData.primaryRole || "STANDARD";
+                const roleDetail = elementData.roleDetail || "N/A";
+                const sourcingPH = elementData.sourcingPH || "None noted.";
+                const cost = elementData.cost || "N/A";
+                const recycling = elementData.recycling || "N/A";
+                const estimatedPrice = elementData.estimatedPricePHPg || "N/A";
+                
+                const column = document.createElement('div');
+                column.className = 'p-4 rounded-xl shadow-lg border-2 border-purple-300 ' + colorClass.replace('bg-', 'bg-');
+                
+                column.innerHTML = `
+                    <div class="text-center mb-4">
+                        <span class="text-4xl font-extrabold text-white font-poppins">${elementData.s}</span>
+                        <h3 class="text-xl font-bold text-gray-800">${elementData.name}</h3>
+                        <p class="text-sm text-gray-600">#${elementData.n} (${elementData.category})</p>
+                    </div>
+                    
+                    <div class="space-y-3 mt-4 text-sm bg-white p-3 rounded-lg shadow-inner">
+                        <p><strong>Primary Role:</strong> <span class="font-bold text-purple-600">${primaryRole.replace(/_/g, ' ')}</span></p>
+                        <p><strong>Cost/Volume:</strong> <span class="font-mono">${cost}</span></p>
+                        <p><strong>Est. Price/g:</strong> <span class="font-bold text-pink-600">${estimatedPrice}</span></p>
+                        <p><strong>Recycling Rate:</strong> ${recycling}</p>
+                        <p class="mt-3"><strong>Role Detail:</strong> ${roleDetail}</p>
+                        <p class="mt-3"><strong>Sourcing (PH):</strong> ${sourcingPH}</p>
+                    </div>
+                `;
+                compareContainer.appendChild(column);
+            });
+            
+            // Show modal with animation
+            compareModal.classList.remove('hidden');
+            compareModal.classList.add('flex', 'opacity-0');
+            void compareModal.offsetWidth; 
+            compareModal.classList.remove('opacity-0');
+            document.getElementById('compare-modal-content').classList.remove('opacity-0', 'scale-95');
+            document.getElementById('compare-modal-content').classList.add('opacity-100', 'scale-100');
+        }
+        
+        /**
+         * Hides the element comparison modal.
+         */
+        function hideComparison() {
+            document.getElementById('compare-modal-content').classList.remove('opacity-100', 'scale-100');
+            document.getElementById('compare-modal-content').classList.add('opacity-0', 'scale-95');
+            
+            compareModal.classList.remove('opacity-100');
+            compareModal.classList.add('opacity-0');
+
+            setTimeout(() => {
+                compareModal.classList.remove('flex');
+                compareModal.classList.add('hidden');
+            }, 300); // Match transition duration
+        }
+
+
+        /**
+         * Shows the element details modal.
+         */
+        function showDetails(element) {
+            const detail = CRITICAL_ELEMENT_DATA[element.s] || {};
+            
+            // Default Values
+            const primaryRole = detail.primaryRole || "STANDARD";
+            const roleDetail = detail.roleDetail || "No specific critical energy role identified. This is a common element with typical industrial uses.";
+            const sourcingGlobal = detail.sourcingGlobal || "Globally abundant or widely traded, often sourced from standard mining regions.";
+            const sourcingPH = detail.sourcingPH || "No known commercial sourcing or local relevance noted.";
+            const cost = detail.cost || "L/H (Low Cost/High Volume)";
+            const recycling = detail.recycling || "Very High";
+            const hazard = detail.hazard || "None";
+            const estimatedPrice = detail.estimatedPricePHPg || "N/A - Too Volatile/Rare";
+
+
+            // Update Modal content
+            document.getElementById('modal-name').textContent = element.name;
+            document.getElementById('modal-number').textContent = `Atomic Number: ${element.n}`;
+            document.getElementById('modal-weight').textContent = element.weight;
+            document.getElementById('modal-category').textContent = element.category;
+            document.getElementById('modal-re-role').innerHTML = roleDetail;
+            document.getElementById('modal-cost').textContent = cost;
+            document.getElementById('modal-recycling').textContent = recycling;
+            document.getElementById('modal-sourcing-global').textContent = sourcingGlobal;
+            document.getElementById('modal-sourcing-ph').textContent = sourcingPH;
+            document.getElementById('modal-price-php').textContent = `~ ${estimatedPrice} PHP/g`;
+
+
+            const statusElement = document.getElementById('modal-re-status');
+            const symbolBox = document.getElementById('modal-symbol-box');
+            const hazardElement = document.getElementById('modal-hazard');
+            const compareCheckbox = document.getElementById('compare-checkbox'); // Get the checkbox
+
+            // Check/Uncheck the comparison checkbox based on current list state
+            compareCheckbox.checked = comparisonList.includes(element.s);
+            compareCheckbox.value = element.s; // Set the value for use in toggleCompare
+
+            // Reset classes
+            statusElement.className = 'text-lg font-bold p-2 rounded-xl mb-3 border-2';
+            symbolBox.className = 'w-16 h-16 flex items-center justify-center rounded-xl shadow-xl mr-4 text-4xl font-extrabold text-white flex-shrink-0 border-b-4';
+
+            // Set Status Colors
+            if (primaryRole === 'RENEWABLE') {
+                statusElement.textContent = 'Status: Renewable Energy Critical';
+                statusElement.classList.add('bg-lime-100', 'text-lime-700', 'border-lime-300');
+                symbolBox.classList.add('bg-lime-600', 'border-lime-800');
+            } else if (primaryRole === 'NON_RENEWABLE_NUCLEAR') {
+                statusElement.textContent = 'Status: Nuclear (Non-Renewable) Critical';
+                statusElement.classList.add('bg-pink-100', 'text-pink-700', 'border-pink-300');
+                symbolBox.classList.add('bg-pink-600', 'border-pink-800');
+            } else if (primaryRole === 'FOSSIL_FUEL') {
+                statusElement.textContent = 'Status: Fossil Fuel Critical';
+                statusElement.classList.add('bg-orange-100', 'text-orange-700', 'border-orange-300');
+                symbolBox.classList.add('bg-orange-600', 'border-orange-800');
+            } else if (primaryRole === 'INFRASTRUCTURE') {
+                statusElement.textContent = 'Status: General Infrastructure Component';
+                statusElement.classList.add('bg-sky-100', 'text-sky-700', 'border-sky-300');
+                symbolBox.classList.add('bg-sky-600', 'border-sky-800');
+            } else if (primaryRole === 'WASTE') {
+                statusElement.textContent = 'Status: Waste or Byproduct Element';
+                statusElement.classList.add('bg-slate-100', 'text-slate-700', 'border-slate-300');
+                symbolBox.classList.add('bg-slate-600', 'border-slate-800');
+            } else {
+                statusElement.textContent = 'Status: Standard Industrial Element';
+                statusElement.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-300');
+                symbolBox.classList.add('bg-gray-500', 'border-gray-700');
+            }
+
+            // Set Hazard Notes
+            if (hazard === 'Toxic') {
+                hazardElement.innerHTML = `⚠️ **Hazard Alert:** Highly Poisonous/Toxic. Bioaccumulates or is a neurotoxin.`;
+                hazardElement.classList.add('text-red-700');
+            } else if (hazard === 'Restricted') {
+                hazardElement.innerHTML = `🔒 **Restriction Warning:** Nuclear Proliferation Risk or strictly controlled material.`;
+                hazardElement.classList.add('text-red-700');
+            } else if (hazard === 'Rare') {
+                hazardElement.innerHTML = `💎 **Scarcity Warning:** Highly scarce or concentrated in limited geographic areas (Rare Earth Element).`;
+                hazardElement.classList.add('text-blue-700');
+            } else {
+                hazardElement.textContent = 'No major immediate industrial hazards noted.';
+                hazardElement.classList.add('text-green-700');
+            }
+
+
+            symbolBox.textContent = element.s;
+            
+            // Draw the Atomic Model
+            drawBohrModel(element.n);
+
+            // Show modal with animation
+            detailModal.classList.remove('hidden');
+            detailModal.classList.add('flex', 'opacity-0');
+            void detailModal.offsetWidth; 
+            detailModal.classList.remove('opacity-0');
+            document.getElementById('modal-content').classList.remove('opacity-0', 'scale-95');
+            document.getElementById('modal-content').classList.add('opacity-100', 'scale-100');
+        }
+
+        /**
+         * Hides the element details modal.
+         */
+        function hideDetails() {
+            document.getElementById('modal-content').classList.remove('opacity-100', 'scale-100');
+            document.getElementById('modal-content').classList.add('opacity-0', 'scale-95');
+            
+            detailModal.classList.remove('opacity-100');
+            detailModal.classList.add('opacity-0');
+
+            setTimeout(() => {
+                detailModal.classList.remove('flex');
+                detailModal.classList.add('hidden');
+            }, 300); // Match transition duration
+        }
+
+        /**
+         * Main function to handle filtering and searching.
+         */
+        function handleUpdates() {
+            const filterTerm = searchInput.value.toLowerCase().trim();
+            const filterValue = document.getElementById('technology-filter').value;
+            renderTable(filterTerm, filterValue, isPhFilterActive);
+        }
+        
+        // --- Music Player Logic ---
+
+        // NEW: Function to start the 10-second prompt
+        function promptStartMusic() {
+            if (isPlaying) return; // Prevent starting if already playing
+
+            // Disable button during countdown
+            startSongButton.disabled = true;
+            musicToggle.disabled = true;
+            startSongButton.classList.add('opacity-50');
+
+            const musicPrompt = document.getElementById('music-prompt');
+            let timeLeft = 10;
+            musicPrompt.innerHTML = `🎵 **Starting in ${timeLeft} seconds!** Get ready to sing along! 🎵`;
+            
+            // Clear any previous timer just in case
+            if (countdownTimer) clearInterval(countdownTimer);
+
+            countdownTimer = setInterval(() => {
+                timeLeft--;
+                if (timeLeft > 0) {
+                    musicPrompt.innerHTML = `🎵 **Starting in ${timeLeft} seconds!** Get ready to sing along! 🎵`;
+                } else {
+                    clearInterval(countdownTimer);
+                    startMusicPlayback();
+                }
+            }, 1000);
+        }
+
+        // NEW: Function to handle the actual playback after delay
+        function startMusicPlayback() {
+            if (!dynamicAudioPlayer) {
+                // 1. Create the audio element on the first click
+                dynamicAudioPlayer = new Audio();
+                dynamicAudioPlayer.loop = true;
+                dynamicAudioPlayer.src = AUDIO_URL;
+                dynamicAudioPlayer.onerror = () => {
+                    document.getElementById('music-prompt').textContent = "⚠️ Error loading song. Check the audio link.";
+                    resetMusicControls();
+                };
+            }
+            
+            dynamicAudioPlayer.play().catch(e => {
+                console.error("Autoplay failed:", e);
+                // If play fails, reset controls but keep the song loaded
+                resetMusicControls();
+            });
+
+            isPlaying = true;
+            musicToggle.disabled = false;
+            startSongButton.style.display = 'none'; // Hide the start button
+            musicToggle.classList.remove('bg-pink-500');
+            musicToggle.classList.add('bg-green-600');
+            // Pause Icon Path
+            document.getElementById('music-icon').innerHTML = '<path fill-rule="evenodd" d="M3 5a1 1 0 011-1h2a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V5zm8 0a1 1 0 011-1h2a1 1 0 011 1v10a1 1 0 01-1 1h-2a1 1 0 01-1-1V5z" clip-rule="evenodd" />';
+            document.getElementById('music-toggle-text').textContent = "Pause";
+            document.getElementById('music-prompt').textContent = "🎶 Element fun is playing! 🎶";
+        }
+        
+        // Combined Play/Pause toggle function
+        function toggleMusic() {
+            if (!dynamicAudioPlayer) return; // Should not happen if startMusicPlayback ran
+
+            if (isPlaying) {
+                dynamicAudioPlayer.pause();
+                musicToggle.classList.remove('bg-green-600');
+                musicToggle.classList.add('bg-pink-500');
+                // Play Icon Path
+                document.getElementById('music-icon').innerHTML = '<path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L5 14.772V3a1 1 0 00-2 0v16a.5.5 0 00.5.5h.5a.5.5 0 00.5-.5v-7.586l14.5-11.581A1 1 0 0018 3z" clip-rule="evenodd" />';
+                document.getElementById('music-toggle-text').textContent = "Play";
+                document.getElementById('music-prompt').textContent = "Song Paused. Click 'Play' to continue!";
+            } else {
+                dynamicAudioPlayer.play().catch(e => console.error("Play failed:", e));
+                musicToggle.classList.remove('bg-pink-500');
+                musicToggle.classList.add('bg-green-600');
+                // Pause Icon Path
+                document.getElementById('music-icon').innerHTML = '<path fill-rule="evenodd" d="M3 5a1 1 0 011-1h2a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V5zm8 0a1 1 0 011-1h2a1 1 0 011 1v10a1 1 0 01-1 1h-2a1 1 0 01-1-1V5z" clip-rule="evenodd" />';
+                document.getElementById('music-toggle-text').textContent = "Pause";
+                document.getElementById('music-prompt').textContent = "🎶 Element fun is playing! 🎶";
+            }
+            isPlaying = !isPlaying;
+        }
+
+        // NEW: Function to reset music controls (used if playback fails)
+        function resetMusicControls() {
+            if (dynamicAudioPlayer) {
+                dynamicAudioPlayer.pause();
+                dynamicAudioPlayer = null; // Clear the instance
+            }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+            isPlaying = false;
+            startSongButton.disabled = false;
+            startSongButton.classList.remove('opacity-50');
+            startSongButton.style.display = 'flex'; // Show the start button
+            musicToggle.disabled = true;
+            musicToggle.classList.remove('bg-green-600');
+            musicToggle.classList.add('bg-pink-500');
+            document.getElementById('music-icon').innerHTML = '<path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L5 14.772V3a1 1 0 00-2 0v16a.5.5 0 00.5.5h.5a.5.5 0 00.5-.5v-7.586l14.5-11.581A1 1 0 0018 3z" clip-rule="evenodd" />';
+            document.getElementById('music-toggle-text').textContent = "Play";
+            document.getElementById('music-prompt').textContent = "Click \"Start Song\" if you want to play the most awesome periodic table song!";
+        }
+
+        // NEW: Function to reset the entire application state
+        function resetApp() {
+            // 1. Reset Filters and Search
+            searchInput.value = '';
+            document.getElementById('technology-filter').value = 'ALL';
+            isPhFilterActive = false;
+            phFilterToggle.classList.remove('bg-red-500', 'hover:bg-red-600', 'border-red-700');
+            phFilterToggle.classList.add('bg-green-500', 'hover:bg-green-600', 'border-green-700');
+            document.getElementById('ph-filter-text').textContent = "🇵🇭 Elements Found in PH";
+            
+            // 2. Reset Comparison
+            clearComparison(); // Also calls updateCompareButtonState and renderTable
+
+            // 3. Reset Music
+            resetMusicControls();
+            
+            // 4. Re-render table with default settings
+            renderTable();
+        }
+        
+        // --- Philippines Filter Logic (Defined outside the music section) ---
+        function togglePhFilter() {
+            isPhFilterActive = !isPhFilterActive;
+            const phButton = document.getElementById('ph-filter-toggle');
+            
+            if (isPhFilterActive) {
+                phButton.classList.remove('bg-green-500', 'hover:bg-green-600');
+                phButton.classList.add('bg-red-500', 'hover:bg-red-600', 'border-red-700');
+                document.getElementById('ph-filter-text').textContent = "🇵🇭 Showing Local Resources (Click to Show All)";
+            } else {
+                phButton.classList.remove('bg-red-500', 'hover:bg-red-600', 'border-red-700');
+                phButton.classList.add('bg-green-500', 'hover:bg-green-600', 'border-green-700');
+                document.getElementById('ph-filter-text').textContent = "🇵🇭 Elements Found in PH";
+            }
+
+            // Reset the dropdown filter to ALL when enabling the PH filter for clarity
+            document.getElementById('technology-filter').value = 'ALL';
+            handleUpdates();
+        }
+
+
+        // --- Event Listeners and Initialization ---
+        searchInput.addEventListener('input', handleUpdates);
+        document.getElementById('technology-filter').addEventListener('change', handleUpdates);
+        
+        // Close modal when clicking outside
+        detailModal.addEventListener('click', (e) => {
+            if (e.target === detailModal) {
+                hideDetails();
+            }
+        });
+        
+        compareModal.addEventListener('click', (e) => {
+            if (e.target === compareModal) {
+                hideComparison();
+            }
+        });
+        
+        // This line is now REMOVED as the onclick is directly on the HTML button
+        // phFilterToggle.addEventListener('click', togglePhFilter); 
+
+        // Initialize the table on load
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTable();
+            // Ensure music starts in reset state
+            resetMusicControls(); 
+        });
+
+    </script>
+</body>
+</html>
